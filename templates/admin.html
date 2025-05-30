@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Multi-User Chat App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #fbbf24;
+            --primary-color-hover: #f59e0b;
+            --secondary-color: #d97706;
+            --secondary-color-hover: #b45309;
+            --light-color: #f3f4f6;
+            --dark-color: #1e1e1e;
+            --darker-color: #171717;
+            --success-color: #3ba55c;
+            --warning-color: #fbbf24;
+            --danger-color: #ed4245;
+            --text-light: #ffffff;
+            --text-muted: #9ca3af;
+            --border-radius: 8px;
+            --transition-speed: 0.2s;
+        }
+        body {
+            background-color: #f9fafb;
+            color: var(--dark-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .sidebar {
+            background-color: var(--darker-color);
+            color: var(--text-light);
+            height: 100vh;
+            transition: all 0.3s;
+        }
+        .sidebar-link {
+            color: var(--text-light);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        .sidebar-link:hover, .sidebar-link.active {
+            background-color: rgba(251, 191, 36, 0.2);
+            color: var(--primary-color);
+        }
+        .sidebar-link i {
+            margin-right: 0.75rem;
+            width: 1.5rem;
+            text-align: center;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+        .card:hover {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .stat-card {
+            border-left: 4px solid var(--primary-color);
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: var(--dark-color);
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-color-hover);
+        }
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-danger:hover {
+            background-color: #c53030;
+        }
+        .table-container {
+            overflow-x: auto;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background-color: #f9fafb;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #4b5563;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        tr:hover {
+            background-color: #f9fafb;
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-success {
+            background-color: rgba(59, 165, 92, 0.1);
+            color: var(--success-color);
+        }
+        .badge-warning {
+            background-color: rgba(251, 191, 36, 0.1);
+            color: var(--warning-color);
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .dark-mode {
+            background-color: #121212;
+            color: var(--text-light);
+        }
+        .dark-mode .card {
+            background-color: #1e1e1e;
+            color: var(--text-light);
+        }
+        .dark-mode th {
+            background-color: #2d2d2d;
+            color: var(--text-light);
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .dark-mode td {
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .dark-mode tr:hover {
+            background-color: #2d2d2d;
+        }
+        .dark-mode .btn-primary {
+            color: var(--dark-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="sidebar w-64 p-4 hidden md:block">
+            <div class="flex items-center mb-8">
+                <h1 class="text-xl font-bold text-[color:var(--primary-color)]">Admin Dashboard</h1>
+            </div>
+            
+            <nav>
+                <a href="#" class="sidebar-link active" data-tab="dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a href="#" class="sidebar-link" data-tab="users">
+                    <i class="fas fa-users"></i> Users
+                </a>
+                <a href="#" class="sidebar-link" data-tab="messages">
+                    <i class="fas fa-comments"></i> Messages
+                </a>
+                <a href="#" class="sidebar-link" data-tab="direct-messages">
+                    <i class="fas fa-envelope"></i> Direct Messages
+                </a>
+                <div class="border-t border-gray-700 my-4"></div>
+                <a href="/" class="sidebar-link">
+                    <i class="fas fa-arrow-left"></i> Back to Chat
+                </a>
+                <a href="/logout" class="sidebar-link">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </nav>
+            
+            <div class="mt-auto pt-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-400">Theme</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="themeToggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[color:var(--primary-color)]"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile sidebar toggle -->
+        <div class="md:hidden fixed top-4 left-4 z-50">
+            <button id="sidebarToggle" class="bg-[color:var(--darker-color)] text-white p-2 rounded-md">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+        
+        <!-- Mobile sidebar -->
+        <div id="mobileSidebar" class="fixed inset-0 z-40 transform -translate-x-full transition-transform duration-300 ease-in-out md:hidden">
+            <div class="bg-black bg-opacity-50 absolute inset-0" id="sidebarOverlay"></div>
+            <div class="sidebar w-64 p-4 h-full relative z-10">
+                <div class="flex items-center justify-between mb-8">
+                    <h1 class="text-xl font-bold text-[color:var(--primary-color)]">Admin Dashboard</h1>
+                    <button id="closeSidebar" class="text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <nav>
+                    <a href="#" class="sidebar-link active" data-tab="dashboard">
+                        <i class="fas fa-tachometer-alt"></i> Dashboard
+                    </a>
+                    <a href="#" class="sidebar-link" data-tab="users">
+                        <i class="fas fa-users"></i> Users
+                    </a>
+                    <a href="#" class="sidebar-link" data-tab="messages">
+                        <i class="fas fa-comments"></i> Messages
+                    </a>
+                    <a href="#" class="sidebar-link" data-tab="direct-messages">
+                        <i class="fas fa-envelope"></i> Direct Messages
+                    </a>
+                    <div class="border-t border-gray-700 my-4"></div>
+                    <a href="/" class="sidebar-link">
+                        <i class="fas fa-arrow-left"></i> Back to Chat
+                    </a>
+                    <a href="/logout" class="sidebar-link">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-8 md:ml-64 mt-16 md:mt-0 overflow-y-auto">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Total Users -->
+                    <div class="card stat-card p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-yellow-100">
+                                <i class="fas fa-users text-[color:var(--primary-color)] text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-gray-500 text-sm">Total Users</h3>
+                                <p class="text-2xl font-semibold" id="totalUsers">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Messages -->
+                    <div class="card stat-card p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-yellow-100">
+                                <i class="fas fa-comments text-[color:var(--primary-color)] text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-gray-500 text-sm">Total Messages</h3>
+                                <p class="text-2xl font-semibold" id="totalMessages">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Direct Messages -->
+                    <div class="card stat-card p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-yellow-100">
+                                <i class="fas fa-envelope text-[color:var(--primary-color)] text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-gray-500 text-sm">Direct Messages</h3>
+                                <p class="text-2xl font-semibold" id="totalDirectMessages">-</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Rooms -->
+                    <div class="card stat-card p-6">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-yellow-100">
+                                <i class="fas fa-door-open text-[color:var(--primary-color)] text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-gray-500 text-sm">Active Rooms</h3>
+                                <p class="text-2xl font-semibold" id="activeRooms">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="users" class="tab-content space-y-6">
+                <div class="card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-semibold">User Management</h2>
+                        <div class="flex space-x-4">
+                            <input type="text" id="userSearch" placeholder="Search users..." class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--primary-color)]">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Created At</th>
+                                    <th>Role</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTableBody">
+                                <!-- User rows will be dynamically added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages Tab -->
+            <div id="messages" class="tab-content space-y-6">
+                <div class="card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-semibold">Message History</h2>
+                        <div class="flex space-x-4">
+                            <input type="text" id="messageSearch" placeholder="Search messages..." class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--primary-color)]">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Room</th>
+                                    <th>Message</th>
+                                    <th>Time</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="messageTableBody">
+                                <!-- Message rows will be dynamically added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Direct Messages Tab -->
+            <div id="direct-messages" class="tab-content space-y-6">
+                <div class="card p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-semibold">Direct Messages</h2>
+                        <div class="flex space-x-4">
+                            <input type="text" id="dmSearch" placeholder="Search direct messages..." class="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[color:var(--primary-color)]">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Message</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dmTableBody">
+                                <!-- Direct message rows will be dynamically added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+
+        // Load theme preference
+        if (localStorage.getItem('theme') === 'dark') {
+            body.classList.add('dark-mode');
+            themeToggle.checked = true;
+        }
+
+        themeToggle.addEventListener('change', () => {
+            body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', body.classList.contains('dark-mode') ? 'dark' : 'light');
+        });
+
+        // Tab Switching
+        const tabLinks = document.querySelectorAll('.sidebar-link[data-tab]');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetTab = link.dataset.tab;
+
+                // Update active states
+                tabLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === targetTab) {
+                        content.classList.add('active');
+                    }
+                });
+
+                // Close mobile sidebar
+                closeMobileSidebar();
+
+                // Load data for the active tab
+                loadTabData(targetTab);
+            });
+        });
+
+        // Mobile Sidebar
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const mobileSidebar = document.getElementById('mobileSidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const closeSidebarBtn = document.getElementById('closeSidebar');
+
+        function openMobileSidebar() {
+            mobileSidebar.classList.remove('-translate-x-full');
+        }
+
+        function closeMobileSidebar() {
+            mobileSidebar.classList.add('-translate-x-full');
+        }
+
+        sidebarToggle.addEventListener('click', openMobileSidebar);
+        closeSidebarBtn.addEventListener('click', closeMobileSidebar);
+        sidebarOverlay.addEventListener('click', closeMobileSidebar);
+
+        // Data Loading Functions
+        async function loadTabData(tab) {
+            switch (tab) {
+                case 'dashboard':
+                    await loadDashboardStats();
+                    break;
+                case 'users':
+                    await loadUsers();
+                    break;
+                case 'messages':
+                    await loadMessages();
+                    break;
+                case 'direct-messages':
+                    await loadDirectMessages();
+                    break;
+            }
+        }
+
+        // Dashboard Stats
+        async function loadDashboardStats() {
+            try {
+                const response = await fetch('/admin/stats');
+                const data = await response.json();
+                
+                document.getElementById('totalUsers').textContent = data.total_users;
+                document.getElementById('totalMessages').textContent = data.total_messages;
+                document.getElementById('totalDirectMessages').textContent = data.total_direct_messages;
+                document.getElementById('activeRooms').textContent = data.active_rooms;
+            } catch (error) {
+                console.error('Error loading dashboard stats:', error);
+            }
+        }
+
+        // Users Management
+        async function loadUsers() {
+            try {
+                const response = await fetch('/admin/users');
+                const data = await response.json();
+                const tbody = document.getElementById('userTableBody');
+                tbody.innerHTML = '';
+
+                data.users.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${user.username}</td>
+                        <td>${user.email}</td>
+                        <td>${new Date(user.created_at).toLocaleString()}</td>
+                        <td>
+                            <span class="badge ${user.is_admin ? 'badge-warning' : 'badge-success'}">
+                                ${user.is_admin ? 'Admin' : 'User'}
+                            </span>
+                        </td>
+                        <td class="space-x-2">
+                            ${user.username !== currentUser ? `
+                                <button onclick="toggleAdmin(${user.id})" class="btn-primary px-3 py-1 rounded-lg text-sm">
+                                    ${user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                                </button>
+                                <button onclick="deleteUser(${user.id})" class="btn-danger px-3 py-1 rounded-lg text-sm">
+                                    Delete
+                                </button>
+                            ` : ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Messages Management
+        async function loadMessages() {
+            try {
+                const response = await fetch('/admin/messages');
+                const data = await response.json();
+                const tbody = document.getElementById('messageTableBody');
+                tbody.innerHTML = '';
+
+                data.messages.forEach(message => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${message.username}</td>
+                        <td>${message.room}</td>
+                        <td class="max-w-md truncate">${message.content}</td>
+                        <td>${new Date(message.timestamp).toLocaleString()}</td>
+                        <td>
+                            <button onclick="deleteMessage(${message.id})" class="btn-danger px-3 py-1 rounded-lg text-sm">
+                                Delete
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        // Direct Messages Management
+        async function loadDirectMessages() {
+            try {
+                const response = await fetch('/admin/direct_messages');
+                const data = await response.json();
+                const tbody = document.getElementById('dmTableBody');
+                tbody.innerHTML = '';
+
+                data.direct_messages.forEach(dm => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${dm.sender}</td>
+                        <td>${dm.receiver}</td>
+                        <td class="max-w-md truncate">${dm.content}</td>
+                        <td>${new Date(dm.timestamp).toLocaleString()}</td>
+                        <td>
+                            <span class="badge ${dm.is_read ? 'badge-success' : 'badge-warning'}">
+                                ${dm.is_read ? 'Read' : 'Unread'}
+                            </span>
+                        </td>
+                        <td>
+                            <button onclick="deleteDirectMessage(${dm.id})" class="btn-danger px-3 py-1 rounded-lg text-sm">
+                                Delete
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Error loading direct messages:', error);
+            }
+        }
+
+        // User Actions
+        async function toggleAdmin(userId) {
+            try {
+                const response = await fetch(`/admin/toggle_admin/${userId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadUsers();
+                } else {
+                    alert(data.message || 'Failed to toggle admin status');
+                }
+            } catch (error) {
+                console.error('Error toggling admin status:', error);
+                alert('Failed to toggle admin status');
+            }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/delete_user/${userId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadUsers();
+                } else {
+                    alert(data.message || 'Failed to delete user');
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                alert('Failed to delete user');
+            }
+        }
+
+        // Message Actions
+        async function deleteMessage(messageId) {
+            if (!confirm('Are you sure you want to delete this message?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/delete_message/${messageId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadMessages();
+                } else {
+                    alert('Failed to delete message');
+                }
+            } catch (error) {
+                console.error('Error deleting message:', error);
+                alert('Failed to delete message');
+            }
+        }
+
+        // Direct Message Actions
+        async function deleteDirectMessage(dmId) {
+            if (!confirm('Are you sure you want to delete this direct message?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/admin/delete_direct_message/${dmId}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    loadDirectMessages();
+                } else {
+                    alert('Failed to delete direct message');
+                }
+            } catch (error) {
+                console.error('Error deleting direct message:', error);
+                alert('Failed to delete direct message');
+            }
+        }
+
+        // Search Functionality
+        document.getElementById('userSearch').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.getElementById('userTableBody').getElementsByTagName('tr');
+            
+            Array.from(rows).forEach(row => {
+                const username = row.cells[0].textContent.toLowerCase();
+                const email = row.cells[1].textContent.toLowerCase();
+                row.style.display = username.includes(searchTerm) || email.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('messageSearch').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.getElementById('messageTableBody').getElementsByTagName('tr');
+            
+            Array.from(rows).forEach(row => {
+                const username = row.cells[0].textContent.toLowerCase();
+                const content = row.cells[2].textContent.toLowerCase();
+                row.style.display = username.includes(searchTerm) || content.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('dmSearch').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.getElementById('dmTableBody').getElementsByTagName('tr');
+            
+            Array.from(rows).forEach(row => {
+                const sender = row.cells[0].textContent.toLowerCase();
+                const receiver = row.cells[1].textContent.toLowerCase();
+                const content = row.cells[2].textContent.toLowerCase();
+                row.style.display = sender.includes(searchTerm) || receiver.includes(searchTerm) || content.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTabData('dashboard');
+        });
+
+        // Auto-refresh data every 30 seconds
+        setInterval(() => {
+            const activeTab = document.querySelector('.sidebar-link.active').dataset.tab;
+            loadTabData(activeTab);
+        }, 30000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-User Chat App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root {
+            --primary-color: #fbbf24;
+            --primary-color-hover: #f59e0b;
+            --secondary-color: #d97706;
+            --secondary-color-hover: #b45309;
+            --light-color: #f3f4f6;
+            --dark-color: #1e1e1e;
+            --darker-color: #171717;
+            --success-color: #3ba55c;
+            --warning-color: #fbbf24;
+            --danger-color: #ed4245;
+            --text-light: #ffffff;
+            --text-muted: #9ca3af;
+            --border-radius: 8px;
+            --transition-speed: 0.2s;
+        }
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #2d2d2d;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.1);
+        }
+        .message {
+            max-width: 70%;
+            padding: 0.75rem 1.25rem;
+            border-radius: 1.25rem;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .message-username {
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.15rem;
+            font-size: 0.85rem;
+        }
+        .message-content {
+            color: var(--text-light);
+            word-break: break-word;
+            line-height: 1.4;
+        }
+        .message-left {
+            background-color: #2d2d2d;
+            color: var(--text-light);
+            margin-right: auto;
+            border-bottom-left-radius: 0.25rem;
+            border-left: 3px solid var(--primary-color);
+        }
+        .message-right {
+            background-color: rgba(245, 158, 11, 0.8);
+            margin-left: auto;
+            color: #1e1e1e;
+            border-bottom-right-radius: 0.25rem;
+            font-weight: 500;
+        }
+        .system-message {
+            background-color: rgba(251, 191, 36, 0.1);
+            margin: 0.75rem auto;
+            text-align: center;
+            max-width: 85%;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 0.75rem;
+            font-size: 0.9rem;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .sidebar {
+            width: 280px;
+            background-color: var(--darker-color);
+            height: 100vh;
+            overflow-y: auto;
+            border-right: 1px solid rgba(251, 191, 36, 0.2);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+        }
+        .sidebar-room {
+            color: var(--text-light);
+            font-weight: 600;
+            transition: all var(--transition-speed) ease;
+        }
+        .sidebar-room:hover {
+            background-color: rgba(251, 191, 36, 0.15);
+            border-left: 3px solid var(--primary-color);
+        }
+        .sidebar-room-number {
+            color: var(--secondary-color);
+            font-size: 0.85rem;
+        }
+        .sidebar-userlist-item {
+            background-color: #36393f;
+            color: var(--text-light);
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+            transition: all var(--transition-speed) ease;
+            border-left: 3px solid transparent;
+        }
+        .sidebar-userlist-item:hover {
+            border-left-color: var(--primary-color);
+            background-color: #42464d;
+        }
+        .main-chat-area {
+            background-color: #36393f;
+            border-radius: 0.75rem;
+            padding: 1.5rem 1rem 1rem 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .chat-input {
+            background-color: #40444b;
+            color: var(--text-light);
+            border: none;
+            transition: all var(--transition-speed) ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .chat-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--primary-color), 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #2d2d2d;
+            border: 1px solid var(--primary-color);
+        }
+        .chat-send-btn {
+            background-color: var(--primary-color);
+            transition: all var(--transition-speed) ease;
+        }
+        /* --- Dark Mode Styles --- */
+        .dark-mode {
+            background-color: #121212 !important;
+            color: var(--text-light) !important;
+        }
+        .dark-mode body,
+        .dark-mode .main-chat-area,
+        .dark-mode .sidebar,
+        .dark-mode #sidebar,
+        .dark-mode #mainLayout {
+            background-color: #121212 !important;
+            color: var(--text-light) !important;
+        }
+        .dark-mode #settingsModal > div,
+        .dark-mode #loginModal > div,
+        .dark-mode #onlineModal > div,
+        .dark-mode #latestAccountsModal > div {
+            background-color: #1e1e1e !important;
+            color: var(--text-light) !important;
+            border: 1px solid rgba(251, 191, 36, 0.2);
+        }
+        .dark-mode input,
+        .dark-mode textarea {
+            background-color: #2d2d2d !important;
+            color: var(--text-light) !important;
+            border-color: rgba(251, 191, 36, 0.3) !important;
+        }
+        .dark-mode input:focus,
+        .dark-mode textarea:focus {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.4) !important;
+        }
+        .dark-mode .sidebar-userlist-item {
+            background-color: #1e1e1e !important;
+            border-color: rgba(251, 191, 36, 0.2) !important;
+        }
+        .dark-mode .sidebar-userlist-item:hover {
+            background-color: #2d2d2d !important;
+            border-left-color: var(--primary-color) !important;
+        }
+        .dark-mode .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--primary-color) !important;
+        }
+        .dark-mode .bg-white {
+            background-color: #1e1e1e !important;
+            border-bottom: 1px solid rgba(251, 191, 36, 0.2) !important;
+        }
+        .dark-mode .text-[color\:var\(--dark-color\)] {
+            color: var(--text-light) !important;
+        }
+        .dark-mode .text-gray-700,
+        .dark-mode .text-gray-400,
+        .dark-mode .text-blue-600,
+        .dark-mode .text-blue-500 {
+            color: var(--primary-color) !important;
+        }
+        .dark-mode a:hover {
+            color: var(--primary-color-hover) !important;
+        }
+        .dark-mode .border-gray-200,
+        .dark-mode .border-gray-300,
+        .dark-mode .border-gray-600 {
+            border-color: #40444b !important;
+        }
+        .dark-mode .shadow-lg {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+        }
+        .dark-mode .message-left {
+            background-color: #2d2d2d !important;
+            border-left: 3px solid var(--primary-color) !important;
+        }
+        .dark-mode .btn-primary {
+            background-color: var(--primary-color) !important;
+            color: #1e1e1e !important;
+            font-weight: 500 !important;
+        }
+        .dark-mode .system-message {
+            background-color: rgba(251, 191, 36, 0.1) !important;
+            border: 1px solid rgba(251, 191, 36, 0.2) !important;
+        }
+        .chat-send-btn:hover, .chat-send-btn:focus {
+            background-color: var(--primary-color-hover);
+            transform: translateY(-1px);
+        }
+        @media (max-width: 768px) {
+            #mainLayout { flex-direction: column; }
+            #sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 40; }
+            #mainLayout main { margin-left: 0 !important; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 10px;
+            opacity: 0.7;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color-hover);
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-color) transparent;
+            background: transparent;
+        }
+        
+        /* Button styles */
+        button.primary-btn {
+            background-color: var(--primary-color);
+            color: var(--text-light);
+            font-weight: 600;
+            padding: 0.5rem 1.25rem;
+            border-radius: var(--border-radius);
+            transition: all var(--transition-speed) ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        button.primary-btn:hover {
+            background-color: var(--primary-color-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Input field focus styles */
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Login/Create Room Modal Overlay -->
+    <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+        <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative">
+            <!-- Close Icon -->
+            <button onclick="showLoginModal(false)" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none">&times;</button>
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-center text-[color:var(--primary-color)]">Join FlaskTalk</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" id="username" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--primary-color)] focus:ring-[color:var(--primary-color)] p-2">
+                </div>
+                <div id="roomNameGroup" style="display:none;">
+                    <label class="block text-sm font-medium text-gray-700">Room Name</label>
+                    <input type="text" id="roomName" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--primary-color)] focus:ring-[color:var(--primary-color)] p-2">
+                </div>
+                <div id="roomNumberGroup">
+                    <label class="block text-sm font-medium text-gray-700">Room Number</label>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="room" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[color:var(--primary-color)] focus:ring-[color:var(--primary-color)] p-2" readonly>
+                        <button id="copyRoomNumberBtn" onclick="copyRoomNumber()" type="button" class="text-xs px-2 py-1 rounded bg-[color:var(--primary-color)] text-white hover:bg-[color:var(--secondary-color)]" style="display:none;">Copy</button>
+                    </div>
+                </div>
+                <button id="modalActionBtn" onclick="joinRoom()" class="w-full bg-[color:var(--primary-color)] text-white py-2 px-4 rounded-md hover:bg-[color:var(--secondary-color)] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary-color)] focus:ring-offset-2 font-semibold">
+                    Join Room
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- End Login/Create Room Modal -->
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+        <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative">
+            <button onclick="closeSettingsModal()" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none">&times;</button>
+            <h2 class="text-2xl font-bold mb-6 text-center text-[color:var(--primary-color)]">Settings</h2>
+            <div class="space-y-6">
+                <!-- Display Name -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+                    <input type="text" id="settingsDisplayName" class="w-full rounded-md border-gray-300 p-2 mb-2" />
+                    <button onclick="saveDisplayName()" class="bg-[color:var(--primary-color)] text-white px-4 py-2 rounded hover:bg-[color:var(--secondary-color)]">Save Name</button>
+                </div>
+                <!-- Change Password -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Change Password</label>
+                    <input type="password" id="settingsOldPassword" placeholder="Old Password" class="w-full rounded-md border-gray-300 p-2 mb-2" />
+                    <input type="password" id="settingsNewPassword" placeholder="New Password" class="w-full rounded-md border-gray-300 p-2 mb-2" />
+                    <button onclick="changePassword()" class="bg-[color:var(--primary-color)] text-white px-4 py-2 rounded hover:bg-[color:var(--secondary-color)]">Change Password</button>
+                </div>
+                <!-- Theme Toggle -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-700">Dark Mode</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="themeToggle" class="form-checkbox h-5 w-5 text-[color:var(--primary-color)]">
+                        <span class="ml-2 text-gray-600">Enable</span>
+                    </label>
+                </div>
+                <!-- Notification Preferences -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-700">In-App Notifications</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="notifToggle" class="form-checkbox h-5 w-5 text-[color:var(--primary-color)]" checked>
+                        <span class="ml-2 text-gray-600">Enable</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- End Settings Modal -->
+    <!-- Online Users Modal -->
+    <div id="onlineModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+        <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-md relative dark:bg-[#232b36]">
+            <button onclick="closeOnlineModal()" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none">&times;</button>
+            <h2 class="text-2xl font-bold mb-6 text-center text-[color:var(--primary-color)]">Online Users</h2>
+            <ul id="onlineUsersList" class="space-y-4">
+                <!-- Users will be populated by JS -->
+            </ul>
+        </div>
+    </div>
+    <!-- End Online Users Modal -->
+    <!-- Add a mobile menu button for the sidebar -->
+    <button id="mobileMenuBtn" class="md:hidden fixed top-4 left-4 z-50 bg-[color:var(--primary-color)] text-white p-2 rounded-full shadow-lg focus:outline-none transition-opacity duration-200">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+    </button>
+    <div class="flex h-screen" id="mainLayout">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 bg-[color:var(--dark-color)] flex flex-col p-4 fixed md:static inset-y-0 left-0 z-40 transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out md:w-64 w-4/5 max-w-xs md:max-w-none h-full">
+            <!-- Mobile close button -->
+            <button id="sidebarCloseBtn" class="md:hidden absolute top-4 right-4 text-white text-3xl font-bold focus:outline-none" style="display:none;">&times;</button>
+            <div class="flex items-center mb-8">
+                <!-- Sidebar logo/icon: hide on mobile -->
+                <span class="bg-[color:var(--primary-color)] p-2 rounded-full mr-3 hidden md:inline">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </span>
+                <span class="text-2xl font-bold text-white tracking-wide">FlaskTalk</span>
+            </div>
+            <div class="flex flex-col flex-1 min-h-0">
+                <!-- User Info -->
+                <div class="flex items-center mb-6">
+                    <span id="sidebarAvatar" class="w-10 h-10 rounded-full bg-[color:var(--secondary-color)] flex items-center justify-center text-lg font-bold mr-3"></span>
+                    <div>
+                        <div id="sidebarUsername" class="font-semibold text-white"></div>
+                        <div class="text-xs text-green-400">● Online</div>
+                    </div>
+                </div>
+                <!-- Search -->
+                <div class="mb-6">
+                    <input type="text" id="searchInput" placeholder="Search" class="w-full px-3 py-2 rounded bg-[color:var(--light-color)] text-[color:var(--dark-color)] focus:outline-none" />
+                </div>
+                <!-- Menu -->
+                <nav class="mb-6">
+                    <ul class="space-y-2">
+                        <li><a href="#" class="flex items-center px-3 py-2 rounded bg-[color:var(--primary-color)] text-white font-medium"><span class="mr-2">💬</span>Chats</a></li>
+                        <li>
+  <a href="#" onclick="openLatestAccountsModal(); return false;" class="flex items-center px-3 py-2 rounded text-white hover:bg-[color:var(--primary-color)]">
+    <span class="mr-2">🟢</span>Online
+  </a>
+</li>
+                        <li><a href="#" onclick="openSettingsModal()" class="flex items-center px-3 py-2 rounded text-white hover:bg-[color:var(--primary-color)]"><span class="mr-2">⚙️</span>Settings</a></li>
+                        <li><a href="/logout" class="flex items-center px-3 py-2 rounded text-white hover:bg-[color:var(--primary-color)]"><span class="mr-2">🚪</span>Logout</a></li>
+                    </ul>
+                </nav>
+                <!-- Rooms List (scrollable) -->
+                <div class="flex-1 min-h-0">
+                    <div class="text-xs text-gray-400 font-semibold mb-2">ROOMS</div>
+                    <ul class="space-y-1 overflow-y-auto max-h-36 md:max-h-56 bg-transparent custom-scrollbar" style="min-height:2rem;">
+                        <!-- Room list will be dynamically populated by JS -->
+                    </ul>
+                </div>
+                <!-- Direct Messages Section (not scrollable) -->
+                <div class="mt-4">
+                    <div class="text-xs text-gray-400 font-semibold mb-2">DIRECT MESSAGES</div>
+                    <!-- Add user search input -->
+                    <div class="mb-3">
+                        <div class="relative">
+                            <input type="text" 
+                                id="userSearchInput" 
+                                placeholder="Search users..." 
+                                class="w-full px-3 py-2 bg-[color:var(--dark-color)] text-white rounded border border-gray-600 focus:outline-none focus:border-[color:var(--primary-color)]">
+                            <div id="userSearchResults" class="absolute left-0 right-0 mt-1 bg-[color:var(--dark-color)] border border-gray-600 rounded shadow-lg z-50 max-h-48 overflow-y-auto hidden">
+                                <!-- Search results will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div id="directMessagesList" class="space-y-1">
+                        <!-- Direct message conversations will be listed here -->
+                    </div>
+                </div>
+            </div>
+            <!-- Create Room and Join Room Buttons -->
+            <div class="mt-4 flex flex-col gap-2 sticky bottom-0 bg-[color:var(--dark-color)] pt-2 pb-2 z-10">
+                <button onclick="openCreateRoomModal()" class="w-full py-2 rounded bg-[color:var(--primary-color)] text-white font-semibold hover:bg-[color:var(--secondary-color)]">+ Create New Room</button>
+                <button onclick="showLoginModal(true)" class="w-full py-2 rounded border-2 border-[color:var(--primary-color)] text-[color:var(--primary-color)] font-semibold hover:bg-[color:var(--primary-color)] hover:text-white transition">Join Room</button>
+            </div>
+        </aside>
+        <!-- Main content area -->
+        <main class="flex-1 bg-[color:var(--light-color)] flex flex-col md:ml-0 ml-0 pt-0 md:pt-0">
+            <!-- Chat Header -->
+            <div class="flex items-center justify-between pl-16 pr-8 md:px-8 py-6 border-b border-gray-200 bg-white">
+                <div>
+                    <div id="chatRoomName" class="text-xl font-semibold text-[color:var(--dark-color)]"></div>
+                    <div id="participantsCount" class="text-sm text-gray-500">0 participants</div>
+                </div>
+                <div class="flex items-center space-x-2" id="chatHeaderActions">
+                    <button id="leaveRoomBtn" onclick="leaveRoom()" class="p-2 rounded hover:bg-gray-100 text-red-500 hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </button>
+                    <div class="relative" id="userListMenuContainer">
+                        <button class="p-2 rounded hover:bg-gray-100 focus:outline-none" id="userListMenuBtn">
+                            <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                        </button>
+                        <ul id="userListDropdown" class="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 hidden">
+                            <li class="border-b border-gray-100">
+                                <button id="toggleUserListBtn" class="w-full text-left py-2 px-4 hover:bg-gray-100">User List</button>
+                                <ul id="userList" class="py-2 px-4 hidden"></ul>
+                            </li>
+                            <!-- <li class="py-2 px-4 text-gray-400"><button class="w-full text-left" disabled>Placeholder 1</button></li>
+                            <li class="py-2 px-4 text-gray-400"><button class="w-full text-left" disabled>Placeholder 2</button></li> -->
+                        </ul>
+                    </div>
+                    <!-- <button class="p-2 rounded hover:bg-gray-100"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5"/></svg></button>
+                    <button class="p-2 rounded hover:bg-gray-100"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><line x1="2" y1="2" x2="18" y2="18"/></svg></button> -->
+                </div>
+            </div>
+            <!-- Messages Area -->
+            <div class="flex-1 overflow-y-auto px-8 py-6" id="messagesArea">
+                <div class="flex flex-col space-y-4">
+                    <!-- Messages will be dynamically added here -->
+                </div>
+            </div>
+            <!-- Message Input Bar -->
+            <div class="px-8 py-4 bg-white border-t border-gray-200 flex items-center">
+                <input type="text" class="flex-1 rounded-full px-4 py-2 bg-[color:var(--light-color)] border border-gray-200 focus:outline-none mr-3" placeholder="Type your message..." />
+                <button class="bg-[color:var(--primary-color)] text-white px-6 py-2 rounded-full font-semibold hover:bg-[color:var(--secondary-color)]">Send</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- Online Users Modal Logic ---
+        function openOnlineModal() {
+            const modal = document.getElementById('onlineModal');
+            const list = document.getElementById('onlineUsersList');
+            modal.classList.remove('hidden');
+            // Fetch online users from backend
+            fetch('/online_users').then(r => r.json()).then(data => {
+                list.innerHTML = '';
+                if (data.users && data.users.length > 0) {
+                    data.users.forEach(user => {
+                        const li = document.createElement('li');
+                        li.className = 'flex items-center space-x-3';
+                        li.innerHTML = `<span class="inline-block w-8 h-8 bg-[color:var(--primary-color)] text-white rounded-full flex items-center justify-center font-bold">${user.charAt(0).toUpperCase()}</span><span class="font-medium">${user}</span><span class="text-xs text-green-500">Online</span>`;
+                        list.appendChild(li);
+                    });
+                } else {
+                    list.innerHTML = '<li class="text-center text-gray-400">No users online.</li>';
+                }
+            });
+        }
+        function closeOnlineModal() {
+            document.getElementById('onlineModal').classList.add('hidden');
+        }
+        // Set user info from Flask context
+        const CURRENT_USERNAME = "{{ current_username }}";
+        window.addEventListener('DOMContentLoaded', () => {
+            // Update sidebar user info
+            const userInfoName = document.getElementById('sidebarUsername');
+            const userInfoAvatar = document.getElementById('sidebarAvatar');
+            if (userInfoName && CURRENT_USERNAME) {
+                userInfoName.textContent = CURRENT_USERNAME;
+            }
+            if (userInfoAvatar && CURRENT_USERNAME) {
+                userInfoAvatar.textContent = CURRENT_USERNAME.split(' ').map(w => w[0]).join('').toUpperCase();
+            }
+        });
+
+        // Initialize Socket.IO with explicit configuration
+        const socket = io({
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            timeout: 20000
+        });
+
+        let currentRoom = '';
+        let modalMode = 'join'; // 'join' or 'create'
+
+        // Show/hide login modal logic
+        function showLoginModal(show, mode = 'join') {
+            document.getElementById('loginModal').style.display = show ? 'flex' : 'none';
+            document.getElementById('mainLayout').style.filter = show ? 'blur(2px)' : 'none';
+            modalMode = mode;
+            // Adjust modal content
+            const modalTitle = document.getElementById('modalTitle');
+            const roomNameGroup = document.getElementById('roomNameGroup');
+            const roomNumberGroup = document.getElementById('roomNumberGroup');
+            const roomInput = document.getElementById('room');
+            const roomNameInput = document.getElementById('roomName');
+            const actionBtn = document.getElementById('modalActionBtn');
+            const copyBtn = document.getElementById('copyRoomNumberBtn');
+            if (mode === 'create') {
+                modalTitle.textContent = 'Create New Room';
+                roomNameGroup.style.display = '';
+                roomNumberGroup.querySelector('label').textContent = 'Room Number (share this)';
+                // Generate a random 6-digit room number
+                const roomNumber = Math.floor(100000 + Math.random() * 900000).toString();
+                roomInput.value = roomNumber;
+                roomInput.readOnly = true;
+                roomNameInput.value = '';
+                roomNameInput.focus();
+                actionBtn.textContent = 'Create & Join';
+                actionBtn.onclick = createAndJoinRoom;
+                copyBtn.style.display = '';
+            } else {
+                modalTitle.textContent = 'Join FlaskTalk';
+                roomNameGroup.style.display = 'none';
+                roomNumberGroup.querySelector('label').textContent = 'Room Number';
+                roomInput.value = '';
+                roomInput.readOnly = false;
+                actionBtn.textContent = 'Join Room';
+                actionBtn.onclick = joinRoom;
+                copyBtn.style.display = 'none';
+            }
+        }
+        // Show modal by default, but only after DOM is loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            showLoginModal(true, 'join');
+        });
+
+        // --- UI Element References ---
+        const messagesArea = document.getElementById('messagesArea');
+        let messageInput = null;
+        // Wait for DOM to load for input
+        window.addEventListener('DOMContentLoaded', () => {
+            messageInput = document.querySelector('input[placeholder="Type your message..."]');
+            if (messageInput) {
+                messageInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
+            // Attach send button event
+            const sendBtn = document.querySelector('button.bg-\[color:var\(--primary-color\)\]');
+            if (sendBtn) {
+                sendBtn.onclick = sendMessage;
+            }
+        });
+
+        // --- Message Sending ---
+        function sendMessage() {
+            if (!messageInput) return;
+            const message = messageInput.value;
+            if (!message) return;
+            
+            if (activeDirectChat) {
+                // Only require CURRENT_USERNAME for direct messages
+                if (!CURRENT_USERNAME) {
+                    alert('Please set your username before sending a direct message.');
+                    return;
+                }
+                socket.emit('direct_message', {
+                    receiver: activeDirectChat,
+                    message: message
+                });
+                // Immediately show the message in the UI
+                appendDirectMessage({
+                    sender: CURRENT_USERNAME,
+                    message: message,
+                    timestamp: new Date().toISOString(),
+                    id: Date.now() // Temporary ID until server confirms
+                });
+            } else if (currentRoom) {
+                // Send room message and include username
+                socket.emit('message', { 
+                    message: message,
+                    room: currentRoom,
+                    username: CURRENT_USERNAME
+                });
+            } else {
+                alert('Please join a room or start a direct chat first.');
+                return;
+            }
+            messageInput.value = '';
+        }
+
+        // --- Message Display ---
+        function appendMessage({ username, message }) {
+            const isCurrentUser = username === CURRENT_USERNAME;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isCurrentUser ? 'message-right' : 'message-left'}`;
+            msgDiv.innerHTML = `
+                <div class="message-username">${isCurrentUser ? 'You' : username}</div>
+                <div class="message-content">${message}</div>
+            `;
+            messagesArea.querySelector('.flex-col').appendChild(msgDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+        function appendSystemMessage(text) {
+            const sysDiv = document.createElement('div');
+            sysDiv.className = 'mx-auto text-center text-xs text-gray-400 my-2';
+            sysDiv.textContent = text;
+            messagesArea.querySelector('.flex-col').appendChild(sysDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        // --- Socket Events ---
+        socket.on('message', data => {
+            // Only handle room messages when not in a direct chat
+            if (!activeDirectChat) {
+                appendMessage(data);
+            }
+        });
+        socket.on('user_joined', data => {
+            appendSystemMessage(`${data.username} joined the room`);
+        });
+        socket.on('user_left', data => {
+            appendSystemMessage(`${data.username} left the room`);
+        });
+        socket.on('room_users', data => {
+            const userList = document.getElementById('userList');
+            userList.innerHTML = data.users.map(user => 
+                `<li class="sidebar-userlist-item">${user}</li>`
+            ).join('');
+            document.getElementById('participantsCount').textContent = `${data.users.length} participants`;
+            if (data.roomName) {
+                document.getElementById('chatRoomName').textContent = data.roomName;
+            }
+        });
+        socket.on('room_list', data => {
+            const roomList = document.querySelector('.flex-1 ul.space-y-1');
+            if (roomList) {
+                roomList.innerHTML = data.rooms.map(room =>
+                    `<li><a href="#" class="flex items-center justify-between px-3 py-2 rounded text-white hover:bg-white/10"><span>${room.name}</span><span class="text-xs bg-gray-700 text-white rounded-full px-2">${room.count}</span></a></li>`
+                ).join('');
+            }
+        });
+
+        // --- Room/Modal Logic ---
+        function joinRoom() {
+            const username = document.getElementById('username').value;
+            const room = document.getElementById('room').value;
+            if (!username || !room) {
+                alert('Please enter both username and room name');
+                return;
+            }
+            
+            // Clear any active direct chat
+            activeDirectChat = null;
+            
+            socket.emit('join', { username, room });
+            currentRoom = room;
+            showLoginModal(false);
+            
+            // Clear messages area
+            const msgCol = messagesArea.querySelector('.flex-col');
+            if (msgCol) msgCol.innerHTML = '';
+            
+            // Update UI
+            document.getElementById('chatRoomName').textContent = room;
+            document.getElementById('participantsCount').textContent = '0 participants';
+            document.getElementById('leaveRoomBtn').classList.remove('hidden');
+            updateChatHeaderActions();
+        }
+
+        function openCreateRoomModal() {
+            showLoginModal(true, 'create');
+        }
+
+        function copyRoomNumber() {
+            const roomInput = document.getElementById('room');
+            roomInput.select();
+            document.execCommand('copy');
+        }
+
+        function createAndJoinRoom() {
+            const username = document.getElementById('username').value;
+            const roomName = document.getElementById('roomName').value;
+            const room = document.getElementById('room').value;
+            if (!username || !roomName) {
+                alert('Please enter both username and room name');
+                return;
+            }
+            socket.emit('join', { username, room, roomName });
+            currentRoom = room;
+            // Do not set room name here, wait for backend
+            showLoginModal(false);
+            // Clear messages area
+            const msgCol = messagesArea.querySelector('.flex-col');
+            if (msgCol) msgCol.innerHTML = '';
+            updateChatHeaderActions();
+        }
+
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const userList = document.getElementById('userList');
+            const users = userList.querySelectorAll('.sidebar-userlist-item');
+            users.forEach(user => {
+                const username = user.textContent.toLowerCase();
+                if (username.includes(searchTerm)) {
+                    user.style.display = '';
+                } else {
+                    user.style.display = 'none';
+                }
+            });
+        });
+
+        // --- Settings Modal Logic ---
+        function openSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+            // Prefill display name
+            document.getElementById('settingsDisplayName').value = document.getElementById('sidebarUsername').textContent;
+            // Prefill theme toggle
+            document.getElementById('themeToggle').checked = document.body.classList.contains('dark-mode');
+            // Prefill notif toggle
+            document.getElementById('notifToggle').checked = window.localStorage.getItem('inAppNotif') !== 'off';
+        }
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+        function saveDisplayName() {
+            const newName = document.getElementById('settingsDisplayName').value.trim();
+            if (!newName) { alert('Display name cannot be empty.'); return; }
+            // Update sidebar immediately
+            document.getElementById('sidebarUsername').textContent = newName;
+            document.getElementById('sidebarAvatar').textContent = newName.split(' ').map(w => w[0]).join('').toUpperCase();
+            // Send to backend
+            fetch('/update_display_name', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({display_name: newName})
+            }).then(r => r.json()).then(data => {
+                if (data.success) {
+                    alert('Display name updated!');
+                    closeSettingsModal();
+                } else {
+                    alert(data.error || 'Failed to update name.');
+                }
+            }).catch(() => alert('Server error.'));
+        }
+        function changePassword() {
+            const oldPw = document.getElementById('settingsOldPassword').value;
+            const newPw = document.getElementById('settingsNewPassword').value;
+            if (!oldPw || !newPw) { alert('Please fill both password fields.'); return; }
+            fetch('/change_password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({old_password: oldPw, new_password: newPw})
+            }).then(r => r.json()).then(data => {
+                if (data.success) {
+                    alert('Password changed!');
+                    closeSettingsModal();
+                } else {
+                    alert(data.error || 'Failed to change password.');
+                }
+            }).catch(() => alert('Server error.'));
+        }
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        function applyThemeFromStorage() {
+            const theme = localStorage.getItem('theme');
+            if (theme === 'dark') {
+                document.body.classList.add('dark-mode');
+                if (themeToggle) themeToggle.checked = true;
+            } else {
+                document.body.classList.remove('dark-mode');
+                if (themeToggle) themeToggle.checked = false;
+            }
+        }
+        if (themeToggle) {
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    document.body.classList.add('dark-mode');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.body.classList.remove('dark-mode');
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        }
+        // Apply theme on load
+        window.addEventListener('DOMContentLoaded', applyThemeFromStorage);
+        // Notification toggle
+        const notifToggle = document.getElementById('notifToggle');
+        if (notifToggle) {
+            notifToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    localStorage.setItem('inAppNotif', 'on');
+                } else {
+                    localStorage.setItem('inAppNotif', 'off');
+                }
+            });
+        }
+
+        // --- Settings Button Logic ---
+        const settingsBtn = document.getElementById('settingsBtn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', openSettingsModal);
+        }
+
+        // Direct Message Functions
+        let activeDirectChat = null;
+        let unreadMessages = {};
+
+        // User Search Functions
+        const userSearchInput = document.getElementById('userSearchInput');
+        const userSearchResults = document.getElementById('userSearchResults');
+        let searchTimeout = null;
+
+        userSearchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                userSearchResults.classList.add('hidden');
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                fetch(`/search_users?query=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        userSearchResults.innerHTML = '';
+                        if (data.users.length === 0) {
+                            userSearchResults.innerHTML = `
+                                <div class="px-3 py-2 text-gray-400">No users found</div>
+                            `;
+                        } else {
+                            data.users.forEach(user => {
+                                const div = document.createElement('div');
+                                div.className = 'px-3 py-2 hover:bg-gray-700 cursor-pointer text-white';
+                                div.textContent = user.username;
+                                div.onclick = () => {
+                                    startDirectChat(user.username);
+                                    userSearchInput.value = '';
+                                    userSearchResults.classList.add('hidden');
+                                };
+                                userSearchResults.appendChild(div);
+                            });
+                        }
+                        userSearchResults.classList.remove('hidden');
+                    })
+                    .catch(error => {
+                        console.error('Error searching users:', error);
+                        userSearchResults.innerHTML = `
+                            <div class="px-3 py-2 text-red-400">Error searching users</div>
+                        `;
+                        userSearchResults.classList.remove('hidden');
+                    });
+            }, 300);
+        });
+
+        // Hide search results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!userSearchInput.contains(e.target) && !userSearchResults.contains(e.target)) {
+                userSearchResults.classList.add('hidden');
+            }
+        });
+
+        // Modify existing startDirectChat function to handle UI updates better
+        function startDirectChat(username) {
+            console.log('Starting direct chat with:', username);
+            if (activeDirectChat === username) return;
+            
+            // Update UI to show active chat
+            activeDirectChat = username;
+            document.getElementById('chatRoomName').textContent = `Chat with ${username}`;
+            document.getElementById('participantsCount').textContent = 'Direct Message';
+            document.getElementById('leaveRoomBtn').classList.add('hidden');
+            
+            // Clear messages area and create new container if needed
+            const messagesContainer = messagesArea.querySelector('.flex-col');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '';
+            } else {
+                const newContainer = document.createElement('div');
+                newContainer.className = 'flex flex-col space-y-4';
+                messagesArea.appendChild(newContainer);
+            }
+            
+            // Add user to direct messages list if not already there
+            updateDirectMessageUI(username);
+            
+            // Load message history
+            socket.emit('get_direct_messages', { username: username });
+            
+            // Clear unread count and update UI
+            if (unreadMessages[username]) {
+                unreadMessages[username] = 0;
+                updateDirectMessageUI(username);
+            }
+            updateChatHeaderActions();
+        }
+
+        function sendDirectMessage() {
+            if (!messageInput || !activeDirectChat) return;
+            const message = messageInput.value;
+            if (!message) return;
+            
+            socket.emit('direct_message', {
+                receiver: activeDirectChat,
+                message: message
+            });
+            messageInput.value = '';
+        }
+
+        function appendDirectMessage(data) {
+            console.log('Appending direct message:', data);
+            const isCurrentUser = data.sender === CURRENT_USERNAME;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${isCurrentUser ? 'message-right' : 'message-left'}`;
+            msgDiv.setAttribute('data-message-id', data.id);
+            
+            const timestamp = new Date(data.timestamp).toLocaleTimeString();
+            msgDiv.innerHTML = `
+                <div class="message-username">${isCurrentUser ? 'You' : data.sender}</div>
+                <div class="message-content">${data.message}</div>
+                <div class="message-timestamp text-xs text-gray-400">${timestamp}</div>
+            `;
+            
+            const messagesContainer = messagesArea.querySelector('.flex-col');
+            if (messagesContainer) {
+                messagesContainer.appendChild(msgDiv);
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+            } else {
+                console.error('Messages container not found!');
+            }
+            
+            // Mark as read if we're the receiver
+            if (!isCurrentUser && data.id) {
+                socket.emit('mark_message_read', { message_id: data.id });
+            }
+        }
+
+        function updateDirectMessageUI(username) {
+            const dmList = document.getElementById('directMessagesList');
+            const existingChat = dmList.querySelector(`[data-username="${username}"]`);
+            
+            if (existingChat) {
+                const unreadBadge = existingChat.querySelector('.unread-badge');
+                if (unreadBadge) {
+                    const unreadCount = unreadMessages[username] || 0;
+                    unreadBadge.textContent = unreadCount;
+                    unreadBadge.style.display = unreadCount > 0 ? 'block' : 'none';
+                }
+            } else {
+                const newChat = document.createElement('div');
+                newChat.className = 'sidebar-userlist-item cursor-pointer';
+                newChat.setAttribute('data-username', username);
+                newChat.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span>${username}</span>
+                        <span class="unread-badge bg-red-500 text-white text-xs rounded-full px-2 py-1" style="display: none;"></span>
+                    </div>
+                `;
+                newChat.onclick = () => startDirectChat(username);
+                dmList.appendChild(newChat);
+            }
+        }
+
+        // Add to existing socket event handlers
+        socket.on('direct_message', data => {
+            // Defensive: Only append the message if we're on the DM page with this user
+            if (activeDirectChat === data.sender) {
+                appendDirectMessage(data);
+            } else {
+                // Optionally, increment unread badge or show notification
+                unreadMessages[data.sender] = (unreadMessages[data.sender] || 0) + 1;
+                updateDirectMessageUI(data.sender);
+                // Optionally, show a notification
+                showInAppNotification(data.sender, data.message);
+            }
+        });
+
+        socket.on('direct_message_sent', data => {
+            console.log('Direct message sent confirmation:', data); // Debug log
+            // Update the temporary message with the server's ID
+            const messages = messagesArea.querySelectorAll('.message');
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage) {
+                lastMessage.setAttribute('data-message-id', data.id);
+            }
+        });
+
+        socket.on('direct_message_history', data => {
+            const msgCol = messagesArea.querySelector('.flex-col');
+            if (msgCol) {
+                msgCol.innerHTML = '';
+                data.messages.forEach(msg => appendDirectMessage(msg));
+            }
+        });
+
+        socket.on('message_read', data => {
+            // Update UI to show message as read
+            const message = document.querySelector(`[data-message-id="${data.message_id}"]`);
+            if (message) {
+                message.classList.add('read');
+            }
+        });
+
+        // Add error handling for socket events
+        socket.on('error', data => {
+            console.error('Socket error:', data);
+            alert(data.message || 'An error occurred');
+        });
+
+        // Add connection status handling
+        socket.on('connect', () => {
+            console.log('Socket connected');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Socket disconnected');
+        });
+
+        // Add notification handling
+        socket.on('new_direct_message', data => {
+            console.log('New direct message notification:', data);
+            
+            // Show browser notification if not in the chat
+            if (activeDirectChat !== data.sender) {
+                if (Notification.permission === "granted") {
+                    new Notification(`New message from ${data.sender}`, {
+                        body: data.message,
+                        icon: '/static/favicon.ico'
+                    });
+                }
+                
+                // Update unread count
+                unreadMessages[data.sender] = (unreadMessages[data.sender] || 0) + 1;
+                updateDirectMessageUI(data.sender);
+                
+                // Show in-app notification
+                showInAppNotification(data.sender, data.message);
+            }
+        });
+
+        // Add in-app notification function
+        function showInAppNotification(sender, message) {
+            const notification = document.createElement('div');
+            notification.className = 'fixed bottom-4 right-4 bg-[color:var(--primary-color)] text-white px-4 py-2 rounded-lg shadow-lg z-50 transform transition-transform duration-300 translate-y-0';
+            notification.innerHTML = `
+                <div class="font-semibold">New message from ${sender}</div>
+                <div class="text-sm opacity-90">${message}</div>
+            `;
+            document.body.appendChild(notification);
+            
+            // Remove notification after 5 seconds
+            setTimeout(() => {
+                notification.style.transform = 'translateY(100%)';
+                setTimeout(() => notification.remove(), 300);
+            }, 5000);
+        }
+
+        // Request notification permission on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission();
+            }
+        });
+
+        // Add this function in the script section
+        function leaveRoom() {
+            if (!currentRoom) return;
+            
+            // Emit leave event to server
+            socket.emit('leave', { room: currentRoom });
+            
+            // Clear room state
+            currentRoom = '';
+            
+            // Update UI
+            document.getElementById('chatRoomName').textContent = '';
+            document.getElementById('participantsCount').textContent = '0 participants';
+            document.getElementById('leaveRoomBtn').classList.add('hidden');
+            
+            // Clear messages area
+            const msgCol = messagesArea.querySelector('.flex-col');
+            if (msgCol) msgCol.innerHTML = '';
+            
+            // Show join room modal
+            showLoginModal(true, 'join');
+            updateChatHeaderActions();
+        }
+
+        // Toggle user list dropdown on 3-dot click
+        window.addEventListener('DOMContentLoaded', () => {
+            const menuBtn = document.getElementById('userListMenuBtn');
+            const dropdown = document.getElementById('userListDropdown');
+            if (menuBtn && dropdown) {
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    dropdown.classList.toggle('hidden');
+                });
+                // Hide dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!dropdown.contains(e.target) && !menuBtn.contains(e.target)) {
+                        dropdown.classList.add('hidden');
+                    }
+                });
+            }
+            // Toggle user list in dropdown
+            const toggleUserListBtn = document.getElementById('toggleUserListBtn');
+            const userList = document.getElementById('userList');
+            if (toggleUserListBtn && userList) {
+                toggleUserListBtn.addEventListener('click', () => {
+                    userList.classList.toggle('hidden');
+                });
+            }
+        });
+
+        // Hide 3-dot menu in direct message
+        function updateChatHeaderActions() {
+            const userListMenuContainer = document.getElementById('userListMenuContainer');
+            if (userListMenuContainer) {
+                if (activeDirectChat) {
+                    userListMenuContainer.style.display = 'none';
+                } else {
+                    userListMenuContainer.style.display = '';
+                }
+            }
+        }
+
+        // Mobile sidebar toggle
+        window.addEventListener('DOMContentLoaded', () => {
+            const sidebar = document.getElementById('sidebar');
+            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+            const sidebarCloseBtn = document.getElementById('sidebarCloseBtn');
+            function openSidebar() {
+                sidebar.classList.remove('-translate-x-full');
+                if (window.innerWidth < 768) {
+                    mobileMenuBtn.style.opacity = '0';
+                    mobileMenuBtn.style.pointerEvents = 'none';
+                    sidebarCloseBtn.style.display = '';
+                }
+            }
+            function closeSidebar() {
+                sidebar.classList.add('-translate-x-full');
+                if (window.innerWidth < 768) {
+                    mobileMenuBtn.style.opacity = '1';
+                    mobileMenuBtn.style.pointerEvents = '';
+                    sidebarCloseBtn.style.display = 'none';
+                }
+            }
+            if (sidebar && mobileMenuBtn) {
+                mobileMenuBtn.addEventListener('click', openSidebar);
+                if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
+                // Hide sidebar when clicking outside on mobile
+                document.addEventListener('click', (e) => {
+                    if (window.innerWidth < 768 && !sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+                        closeSidebar();
+                    }
+                });
+            }
+            // Ensure correct state on resize
+            window.addEventListener('resize', () => {
+                if (window.innerWidth >= 768) {
+                    mobileMenuBtn.style.opacity = '1';
+                    mobileMenuBtn.style.pointerEvents = '';
+                    sidebarCloseBtn.style.display = 'none';
+                } else if (sidebar.classList.contains('-translate-x-full')) {
+                    mobileMenuBtn.style.opacity = '1';
+                    mobileMenuBtn.style.pointerEvents = '';
+                    sidebarCloseBtn.style.display = 'none';
+                } else {
+                    mobileMenuBtn.style.opacity = '0';
+                    mobileMenuBtn.style.pointerEvents = 'none';
+                    sidebarCloseBtn.style.display = '';
+                }
+            });
+        });
+    </script>
+<script>
+// --- Latest Accounts Sidebar Logic ---
+function fetchLatestAccounts() {
+  fetch('/api/latest_accounts')
+    .then(response => response.json())
+    .then(data => {
+      const list = document.getElementById('latestAccountsList');
+      if (!list) return;
+      list.innerHTML = '';
+      if (data.users && data.users.length > 0) {
+        data.users.forEach(user => {
+          const li = document.createElement('li');
+          li.textContent = user;
+          li.className = 'pl-2 py-1 rounded bg-gray-800 text-white';
+          list.appendChild(li);
+        });
+      } else {
+        list.innerHTML = '<li class="text-gray-500">No recent accounts.</li>';
+      }
+    });
+}
+fetchLatestAccounts();
+setInterval(fetchLatestAccounts, 10000);
+</script>
+<!-- Latest Accounts Modal -->
+<div id="latestAccountsModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
+  <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-xs relative">
+    <button onclick="closeLatestAccountsModal()" class="absolute top-3 right-4 text-xl text-gray-400 hover:text-gray-700">&times;</button>
+    <h2 class="text-xl font-bold mb-4 text-center text-[color:var(--primary-color)]">Online Accounts</h2>
+    <ul id="latestAccountsList" class="space-y-2 text-center"></ul>
+  </div>
+</div>
+<script>
+function openLatestAccountsModal() {
+  document.getElementById('latestAccountsModal').classList.remove('hidden');
+  fetchLatestAccounts();
+}
+function closeLatestAccountsModal() {
+  document.getElementById('latestAccountsModal').classList.add('hidden');
+}
+function fetchLatestAccounts() {
+  fetch('/api/latest_accounts')
+    .then(response => response.json())
+    .then(data => {
+      const list = document.getElementById('latestAccountsList');
+      if (!list) return;
+      list.innerHTML = '';
+      if (data.users && data.users.length > 0) {
+        data.users.forEach(user => {
+          const li = document.createElement('li');
+          li.textContent = user;
+          li.className = 'py-2 rounded bg-gray-100 text-[color:var(--dark-color)] font-semibold shadow';
+          list.appendChild(li);
+        });
+      } else {
+        list.innerHTML = '<li class="text-gray-500">No recent accounts.</li>';
+      }
+    });
+}
+document.getElementById('latestAccountsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeLatestAccountsModal();
+});
+</script>
+</body>
+</html> 
