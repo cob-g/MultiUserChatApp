@@ -5,4 +5,5 @@ python-engineio==4.9.0
 eventlet==0.35.1
 Flask-Login==0.6.3
 Flask-Migrate==4.0.5
-Flask-SQLAlchemy==3.1.1 
+gunicorn
+Flask-SQLAlchemy==3.1.1
